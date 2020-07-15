@@ -1,0 +1,11 @@
+
+*.csv
+*.7z
+*.pyc
+*.txt
+*.xlsx
+*.png
+*.zip
+*.hwp
+*.ini
+*.DS_Store

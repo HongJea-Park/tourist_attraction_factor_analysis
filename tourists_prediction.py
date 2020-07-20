@@ -23,20 +23,20 @@ def coef_test(reg, x, y):
 
     _, _, _, mse, _, _ = squared_error_info(reg, x, y)
     n, p = x.shape
-    xmat = x.values
+    xmat = x.values.astype(float)
     xmat = np.concatenate((np.ones((n, 1)), xmat), axis=1)
-    xtx = np.matmul(xmat.T, xmat)
+    xtx = np.matmul(xmat.T, xmat) + reg.alpha_*np.identity(xmat.shape[1])
     inv_xtx = np.linalg.inv(xtx)
     h = np.matmul(inv_xtx, xmat.T)
     beta = np.matmul(h, y.values.reshape(-1, 1))
 
     def star(p_value):
 
-        if p_value < 0.001:
+        if p_value < 0.01:
             return '***'
-        elif p_value < 0.01:
-            return '**'
         elif p_value < 0.05:
+            return '**'
+        elif p_value < 0.1:
             return '*'
         else:
             return ' '
@@ -138,22 +138,31 @@ for level, distance in c_list:
     merge_df = pd.merge(
         merge_df, temperature, how='left', left_on=['date'], right_on=['date'])
 
+    merge_df[[f'neg_{f}' for f in factor_cols]] = \
+        (merge_df[factor_cols] < 0)*1
+    merge_df[[f'rank_{f}' for f in factor_cols]] = \
+        1/(len(factor_cols)-np.argsort(
+            np.argsort(merge_df[factor_cols], axis=1)))
+
     merge_df['monthly_sum'] = np.log(merge_df['monthly_sum']+1)
 
+    cols = [f'neg_{f}' for f in factor_cols] + \
+        [f'rank_{f}' for f in factor_cols] + \
+        mean_cols + min_cols + temperature.columns.tolist()
+    cols.remove('monthly_sum')
     y = merge_df['monthly_sum']
-    x = merge_df[merge_df.columns[2:].drop('monthly_sum')]
+    x = merge_df[cols]
 
     alphas = [10**(-i) for i in range(1, 11)]
     reg = RidgeCV(alphas, cv=10).fit(x, y)
     # reg = LinearRegression().fit(x, y)
     t_test = coef_test(reg, x, y)
 
-    s = t_test.loc[monthly_mean_df.columns[2:]]['0.05 <'].sum()
     result = {
         'level': level,
         'distance': distance,
         'score': reg.score(x, y),
-        's': t_test.loc[monthly_mean_df.columns[2:]]['0.05 <'].sum(),
+        's': t_test.loc[cols]['0.05 <'].sum(),
         't_test': t_test,
         'model': reg}
     result_list.append(result)
